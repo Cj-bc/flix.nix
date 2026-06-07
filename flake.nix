@@ -8,14 +8,14 @@
 
   outputs = { self, nixpkgs, my-nix-utils }:
     let mkFlixOverlay = version: hash: final: prev: {
-      flix = prev.flix.overrideAttrs(finalAttrs: previousAttrs: {
-        version = version;
-        src = prev.fetchurl {
-          url = "https://github.com/flix/flix/releases/download/v${version}/flix.jar";
-          sha256 = hash;
+          flix = prev.flix.overrideAttrs(finalAttrs: previousAttrs: {
+            version = version;
+            src = prev.fetchurl {
+              url = "https://github.com/flix/flix/releases/download/v${version}/flix.jar";
+              sha256 = hash;
+            };
+          });
         };
-      });
-    };
         pkgsForSystemWithOverlays = system: overlays: import nixpkgs { inherit system; inherit overlays; };
         mkDevShell = system: overlays:
           let pkgs = pkgsForSystemWithOverlays system overlays;
