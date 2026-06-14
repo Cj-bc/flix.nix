@@ -22,10 +22,7 @@
           in pkgs.mkShell {
             packages = [ pkgs.flix ];
           };
-        mkApp = pkgs: {
-          type = "app";
-          program = "${pkgs.flix}/bin/flix";
-        };
+        mkApp = flix: { type = "app"; program = "${flix}/bin/flix"; };
         flix_0_71_0 = mkFlixOverlay "0.71.0" "sha256-Ha5oRDpQ7YuGsaF/ZNx8b+HjTSroxZEjzI3zR3g7NXI=";
         flix_0_72_0 = mkFlixOverlay "0.72.0" "sha256-87WDphvCBJf5M46NtKGCTEu6k0g6SF/yttmRrEA8Nis=";
         flix_0_73_0 = mkFlixOverlay "0.73.0" "sha256-X2kiXS4qXAKau1qJswbJfi/gsty49RMW355+yYaBGUM=";
@@ -34,9 +31,9 @@
       overlays = { inherit flix_0_71_0; inherit flix_0_72_0; inherit flix_0_73_0; };
 
       apps.${system} = {
-        flix_0_71_0 = mkApp (pkgsForSystemWithOverlays system [ flix_0_71_0 ]);
-        flix_0_72_0 = mkApp (pkgsForSystemWithOverlays system [ flix_0_72_0 ]);
-        flix_0_73_0 = mkApp (pkgsForSystemWithOverlays system [ flix_0_73_0 ]);
+        flix_0_71_0 = mkApp self.packages.${system}.flix_0_71_0;
+        flix_0_72_0 = mkApp self.packages.${system}.flix_0_72_0;
+        flix_0_73_0 = mkApp self.packages.${system}.flix_0_73_0;
         default = self.apps.${system}.flix_0_73_0;
       };
 
