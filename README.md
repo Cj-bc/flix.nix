@@ -8,7 +8,7 @@ Nix flake providing packages for the [Flix](https://flix.dev/) programming langu
 
 ## Why not nixpkgs#flix?
 
-There's flix package in official nixpkgs repo, but it's currently out of date (it's 0.69.1, whereas latest is 0.73.0 as of writing this) and I understand it's difficult to keep it up-to-date in such a big and trusted repository.
+There's [flix package in official nixpkgs repo](https://search.nixos.org/packages?channel=unstable&query=flix#show=flix), but it's currently out of date (it's 0.69.1, whereas latest is 0.73.0 as of writing this) and I understand it's difficult to keep it up-to-date in such a big and trusted repository.
 
 Flix is actively under development and publishes new versions constantly, which sometimes contains breaking-changes. Thus it's vital to stay using the latest release.
 
