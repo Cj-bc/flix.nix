@@ -37,6 +37,7 @@ default は最新版を指すように更新されます。
 
   outputs = { self, nixpkgs, flix }: {
     packages.x86_64.default = packages.x86_64.stdenv.mkDerivation {
+      ...
       buildInputs = [ flix.x86_64.flix_0_73_0 ];
     };
   };
