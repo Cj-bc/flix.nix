@@ -30,7 +30,13 @@
         flix_0_75_0 = mkFlixOverlay "0.75.0" "sha256-Zk9CvLQkBe+vRDj2dCfC7sFq3wxbNyNrDev3Q8ZrRXs=";
     in my-nix-utils.lib.eachSystems nixpkgs.lib.systems.flakeExposed (system:
     {
-      overlays = { inherit flix_0_71_0; inherit flix_0_72_0; inherit flix_0_73_0; inherit flix_0_74_0; inherit flix_0_75_0; };
+      overlays = {
+        inherit flix_0_71_0;
+        inherit flix_0_72_0;
+        inherit flix_0_73_0;
+        inherit flix_0_74_0;
+        inherit flix_0_75_0;
+      };
 
       apps.${system} = {
         flix_0_71_0 = mkApp self.packages.${system}.flix_0_71_0;
