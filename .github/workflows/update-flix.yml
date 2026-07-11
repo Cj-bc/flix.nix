@@ -1,0 +1,132 @@
+name: Update flix version
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-flix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Get latest flix release
+        id: latest
+        run: |
+          tag=$(curl -sSL -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/flix/flix/releases/latest | jq -r '.tag_name')
+          if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+            echo "::error::Failed to resolve latest flix release tag"
+            exit 1
+          fi
+          version="${tag#v}"
+          attr="flix_$(awk -v v="$version" 'BEGIN { gsub(/\./, "_", v); print v }')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "attr=$attr" >> "$GITHUB_OUTPUT"
+
+      - name: Check if already tracked
+        id: check
+        env:
+          ATTR: ${{ steps.latest.outputs.attr }}
+        run: |
+          if awk -v attr="$ATTR" 'index($0, attr" = mkFlixOverlay") { found = 1 } END { exit !found }' flake.nix; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Insert new version with placeholder hash
+        if: steps.check.outputs.new == 'true'
+        env:
+          ATTR: ${{ steps.latest.outputs.attr }}
+          VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          awk -v attr="$ATTR" -v ver="$VERSION" '
+          {
+            if (inLet && $0 !~ /^        flix_[0-9_]+ = mkFlixOverlay "/) {
+              print "        " attr " = mkFlixOverlay \"" ver "\" nixpkgs.lib.fakeHash;"
+              inLet = 0
+            }
+            if ($0 ~ /^        flix_[0-9_]+ = mkFlixOverlay "/) inLet = 1
+
+            if (inOverlay && $0 !~ /^        inherit flix_[0-9_]+;$/) {
+              print "        inherit " attr ";"
+              inOverlay = 0
+            }
+            if ($0 ~ /^        inherit flix_[0-9_]+;$/) inOverlay = 1
+
+            if ($0 ~ /^        default = self\.apps\.\$\{system\}\.flix_[0-9_]+;$/) {
+              print "        " attr " = mkApp self.packages.${system}." attr ";"
+              print "        default = self.apps.${system}." attr ";"
+              next
+            }
+            if ($0 ~ /^        default = self\.packages\.\$\{system\}\.flix_[0-9_]+;$/) {
+              print "        " attr " = (pkgsForSystemWithOverlays system [ " attr " ]).flix;"
+              print "        default = self.packages.${system}." attr ";"
+              next
+            }
+            if ($0 ~ /^        default = self\.devShells\.\$\{system\}\.flix_[0-9_]+;$/) {
+              print "        " attr " = mkDevShell system [ " attr " ];"
+              print "        default = self.devShells.${system}." attr ";"
+              next
+            }
+
+            print
+          }
+          ' flake.nix > flake.nix.tmp && mv flake.nix.tmp flake.nix
+
+      - name: Resolve source hash
+        if: steps.check.outputs.new == 'true'
+        env:
+          ATTR: ${{ steps.latest.outputs.attr }}
+        run: |
+          nix build ".#packages.x86_64-linux.${ATTR}.src" --no-link > build.log 2>&1 || true
+          hash=$(awk '/got:/ { print $2 }' build.log)
+          if [ -z "$hash" ]; then
+            echo "::error::Failed to resolve hash for ${ATTR}"
+            cat build.log
+            exit 1
+          fi
+          awk -v h="$hash" '{ gsub(/nixpkgs\.lib\.fakeHash;/, "\"" h "\";"); print }' flake.nix > flake.nix.tmp && mv flake.nix.tmp flake.nix
+          rm -f build.log
+
+      - name: Verify build
+        if: steps.check.outputs.new == 'true'
+        env:
+          ATTR: ${{ steps.latest.outputs.attr }}
+        run: nix build ".#packages.x86_64-linux.${ATTR}" --no-link
+
+      - name: Commit and open pull request
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.latest.outputs.version }}
+          ATTR: ${{ steps.latest.outputs.attr }}
+        run: |
+          branch="update-flix-${VERSION}"
+
+          existing=$(gh pr list --head "$branch" --state open --json number --jq 'length')
+          if [ "$existing" != "0" ]; then
+            echo "Pull request for $branch is already open, skipping"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add flake.nix
+          git commit -m "feat: add flix ${VERSION}"
+          git push -u origin "$branch"
+
+          gh pr create \
+            --title "feat: add flix ${VERSION}" \
+            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates \`overlays\`, \`apps.\${system}\`, \`packages.\${system}\` and \`devShells.\${system}\` (including their \`default\`) to point to it. Opened automatically by the update-flix workflow; the source hash was resolved by building against \`nixpkgs.lib.fakeHash\` and capturing the mismatch error."
