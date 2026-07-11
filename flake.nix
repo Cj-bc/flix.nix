@@ -28,6 +28,7 @@
         flix_0_73_0 = mkFlixOverlay "0.73.0" "sha256-X2kiXS4qXAKau1qJswbJfi/gsty49RMW355+yYaBGUM=";
         flix_0_74_0 = mkFlixOverlay "0.74.0" "sha256-hHu5EXDF7PphruFuyY000M5JZqmRcyuv7g4i60T6YvM=";
         flix_0_75_0 = mkFlixOverlay "0.75.0" "sha256-Zk9CvLQkBe+vRDj2dCfC7sFq3wxbNyNrDev3Q8ZrRXs=";
+        flix_0_75_1 = mkFlixOverlay "0.75.1" "sha256-4xd3AK6tiiKkLJEOc7+4oyb+/bq04+rq9tVcMopr2Tg=";
     in my-nix-utils.lib.eachSystems nixpkgs.lib.systems.flakeExposed (system:
     {
       overlays = {
@@ -36,6 +37,7 @@
         inherit flix_0_73_0;
         inherit flix_0_74_0;
         inherit flix_0_75_0;
+        inherit flix_0_75_1;
       };
 
       apps.${system} = {
@@ -44,6 +46,7 @@
         flix_0_73_0 = mkApp self.packages.${system}.flix_0_73_0;
         flix_0_74_0 = mkApp self.packages.${system}.flix_0_74_0;
         flix_0_75_0 = mkApp self.packages.${system}.flix_0_75_0;
+        flix_0_75_1 = mkApp self.packages.${system}.flix_0_75_1;
         default = self.apps.${system}.flix_0_75_0;
       };
 
@@ -53,6 +56,7 @@
         flix_0_73_0 = (pkgsForSystemWithOverlays system [ flix_0_73_0 ]).flix;
         flix_0_74_0 = (pkgsForSystemWithOverlays system [ flix_0_74_0 ]).flix;
         flix_0_75_0 = (pkgsForSystemWithOverlays system [ flix_0_75_0 ]).flix;
+        flix_0_75_1 = (pkgsForSystemWithOverlays system [ flix_0_75_1 ]).flix;
       };
 
       devShells.${system} = {
@@ -61,6 +65,7 @@
         flix_0_73_0 = mkDevShell system [ flix_0_73_0 ];
         flix_0_74_0 = mkDevShell system [ flix_0_74_0 ];
         flix_0_75_0 = mkDevShell system [ flix_0_75_0 ];
+        flix_0_75_1 = mkDevShell system [ flix_0_75_1 ];
         default = self.devShells.${system}.flix_0_75_0;
       };
     });
