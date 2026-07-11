@@ -12,6 +12,8 @@ permissions:
 jobs:
   update-flix:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,8 +24,7 @@ jobs:
       - name: Get latest flix release
         id: latest
         run: |
-          tag=$(curl -sSL -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/flix/flix/releases/latest | jq -r '.tag_name')
+          tag=$(gh release view -R flix/flix --json tagName -q .tagName)
           if [ -z "$tag" ] || [ "$tag" = "null" ]; then
             echo "::error::Failed to resolve latest flix release tag"
             exit 1
@@ -44,8 +45,21 @@ jobs:
             echo "new=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Insert new version with placeholder hash
+      - name: Check for existing pull request
+        id: pr_check
         if: steps.check.outputs.new == 'true'
+        env:
+          VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          existing=$(gh pr list --head "update-flix-${VERSION}" --state open --json number --jq 'length')
+          if [ "$existing" != "0" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Insert new version with placeholder hash
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
           ATTR: ${{ steps.latest.outputs.attr }}
           VERSION: ${{ steps.latest.outputs.version }}
@@ -85,7 +99,7 @@ jobs:
           ' flake.nix > flake.nix.tmp && mv flake.nix.tmp flake.nix
 
       - name: Resolve source hash
-        if: steps.check.outputs.new == 'true'
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
           ATTR: ${{ steps.latest.outputs.attr }}
         run: |
@@ -100,25 +114,18 @@ jobs:
           rm -f build.log
 
       - name: Verify build
-        if: steps.check.outputs.new == 'true'
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
           ATTR: ${{ steps.latest.outputs.attr }}
         run: nix build ".#packages.x86_64-linux.${ATTR}" --no-link
 
       - name: Commit and open pull request
-        if: steps.check.outputs.new == 'true'
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.latest.outputs.version }}
           ATTR: ${{ steps.latest.outputs.attr }}
         run: |
           branch="update-flix-${VERSION}"
-
-          existing=$(gh pr list --head "$branch" --state open --json number --jq 'length')
-          if [ "$existing" != "0" ]; then
-            echo "Pull request for $branch is already open, skipping"
-            exit 0
-          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
