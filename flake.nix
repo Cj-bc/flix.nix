@@ -57,6 +57,7 @@
         flix_0_74_0 = (pkgsForSystemWithOverlays system [ flix_0_74_0 ]).flix;
         flix_0_75_0 = (pkgsForSystemWithOverlays system [ flix_0_75_0 ]).flix;
         flix_0_75_1 = (pkgsForSystemWithOverlays system [ flix_0_75_1 ]).flix;
+        default = self.packages.${system}.flix_0_75_1;
       };
 
       devShells.${system} = {
