@@ -47,7 +47,7 @@
         flix_0_74_0 = mkApp self.packages.${system}.flix_0_74_0;
         flix_0_75_0 = mkApp self.packages.${system}.flix_0_75_0;
         flix_0_75_1 = mkApp self.packages.${system}.flix_0_75_1;
-        default = self.apps.${system}.flix_0_75_0;
+        default = self.apps.${system}.flix_0_75_1;
       };
 
       packages.${system} = {
@@ -66,7 +66,7 @@
         flix_0_74_0 = mkDevShell system [ flix_0_74_0 ];
         flix_0_75_0 = mkDevShell system [ flix_0_75_0 ];
         flix_0_75_1 = mkDevShell system [ flix_0_75_1 ];
-        default = self.devShells.${system}.flix_0_75_0;
+        default = self.devShells.${system}.flix_0_75_1;
       };
     });
 }
