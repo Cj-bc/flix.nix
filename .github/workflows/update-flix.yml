@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+        uses: nixbuild/nix-quick-install-action@v35
 
       - name: Get latest flix release
         id: latest
@@ -37,9 +37,9 @@ jobs:
       - name: Check if already tracked
         id: check
         env:
-          ATTR: ${{ steps.latest.outputs.attr }}
+          VERSION: ${{ steps.latest.outputs.version }}
         run: |
-          if awk -v attr="$ATTR" 'index($0, attr" = mkFlixOverlay") { found = 1 } END { exit !found }' flake.nix; then
+          if jq -e --arg v "$VERSION" 'has($v)' versions.json; then
             echo "new=false" >> "$GITHUB_OUTPUT"
           else
             echo "new=true" >> "$GITHUB_OUTPUT"
@@ -58,60 +58,28 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Insert new version with placeholder hash
+      - name: Resolve source hash
+        id: hash
         if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
-          ATTR: ${{ steps.latest.outputs.attr }}
           VERSION: ${{ steps.latest.outputs.version }}
         run: |
-          awk -v attr="$ATTR" -v ver="$VERSION" '
-          {
-            if (inLet && $0 !~ /^        flix_[0-9_]+ = mkFlixOverlay "/) {
-              print "        " attr " = mkFlixOverlay \"" ver "\" nixpkgs.lib.fakeHash;"
-              inLet = 0
-            }
-            if ($0 ~ /^        flix_[0-9_]+ = mkFlixOverlay "/) inLet = 1
-
-            if (inOverlay && $0 !~ /^        inherit flix_[0-9_]+;$/) {
-              print "        inherit " attr ";"
-              inOverlay = 0
-            }
-            if ($0 ~ /^        inherit flix_[0-9_]+;$/) inOverlay = 1
-
-            if ($0 ~ /^        default = self\.apps\.\$\{system\}\.flix_[0-9_]+;$/) {
-              print "        " attr " = mkApp self.packages.${system}." attr ";"
-              print "        default = self.apps.${system}." attr ";"
-              next
-            }
-            if ($0 ~ /^        default = self\.packages\.\$\{system\}\.flix_[0-9_]+;$/) {
-              print "        " attr " = (pkgsForSystemWithOverlays system [ " attr " ]).flix;"
-              print "        default = self.packages.${system}." attr ";"
-              next
-            }
-            if ($0 ~ /^        default = self\.devShells\.\$\{system\}\.flix_[0-9_]+;$/) {
-              print "        " attr " = mkDevShell system [ " attr " ];"
-              print "        default = self.devShells.${system}." attr ";"
-              next
-            }
-
-            print
-          }
-          ' flake.nix > flake.nix.tmp && mv flake.nix.tmp flake.nix
-
-      - name: Resolve source hash
-        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
-        env:
-          ATTR: ${{ steps.latest.outputs.attr }}
-        run: |
-          nix build ".#packages.x86_64-linux.${ATTR}.src" --no-link > build.log 2>&1 || true
-          hash=$(awk '/got:/ { print $2 }' build.log)
+          hash=$(nix-prefetch-url "https://github.com/flix/flix/releases/download/v${VERSION}/flix.jar")
           if [ -z "$hash" ]; then
-            echo "::error::Failed to resolve hash for ${ATTR}"
-            cat build.log
+            echo "::error::Failed to resolve hash for flix ${VERSION}"
             exit 1
           fi
-          awk -v h="$hash" '{ gsub(/nixpkgs\.lib\.fakeHash;/, "\"" h "\";"); print }' flake.nix > flake.nix.tmp && mv flake.nix.tmp flake.nix
-          rm -f build.log
+          echo "value=$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Insert new version
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.latest.outputs.version }}
+          HASH: ${{ steps.hash.outputs.value }}
+        run: |
+          jq --arg v "$VERSION" --arg h "$HASH" \
+            '. + {($v): $h} | .latest = $v' versions.json > versions.json.tmp
+          mv versions.json.tmp versions.json
 
       - name: Verify build
         if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
@@ -130,10 +98,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add flake.nix
+          git add versions.json
           git commit -m "feat: add flix ${VERSION}"
           git push -u origin "$branch"
 
           gh pr create \
             --title "feat: add flix ${VERSION}" \
-            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates \`overlays\`, \`apps.\${system}\`, \`packages.\${system}\` and \`devShells.\${system}\` (including their \`default\`) to point to it. Opened automatically by the update-flix workflow; the source hash was resolved by building against \`nixpkgs.lib.fakeHash\` and capturing the mismatch error."
+            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow."
