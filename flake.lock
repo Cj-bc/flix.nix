@@ -1,20 +1,5 @@
 {
   "nodes": {
-    "my-nix-utils": {
-      "locked": {
-        "lastModified": 1780765637,
-        "narHash": "sha256-0oOcHxg99EN3PHW9B2u7oAvBxp7h2b9Jh/L1XQH6WO8=",
-        "owner": "Cj-bc",
-        "repo": "my-nix-utils",
-        "rev": "a159b08464f873e65469326940f63d5bd87fa214",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Cj-bc",
-        "repo": "my-nix-utils",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1780243769,
@@ -33,7 +18,6 @@
     },
     "root": {
       "inputs": {
-        "my-nix-utils": "my-nix-utils",
         "nixpkgs": "nixpkgs"
       }
     }

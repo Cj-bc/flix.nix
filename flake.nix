@@ -3,71 +3,72 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    my-nix-utils.url = "github:Cj-bc/my-nix-utils";
   };
 
-  outputs = { self, nixpkgs, my-nix-utils }:
-    let mkFlixOverlay = version: hash: final: prev: {
-          flix = prev.flix.overrideAttrs(finalAttrs: previousAttrs: {
-            version = version;
-            src = prev.fetchurl {
-              url = "https://github.com/flix/flix/releases/download/v${version}/flix.jar";
-              sha256 = hash;
-            };
-          });
-        };
-        pkgsForSystemWithOverlays = system: overlays: import nixpkgs { inherit system; inherit overlays; };
-        mkDevShell = system: overlays:
-          let pkgs = pkgsForSystemWithOverlays system overlays;
-          in pkgs.mkShell {
-            packages = [ pkgs.flix ];
+  outputs = { self, nixpkgs }:
+    let
+      flixData = builtins.fromJSON (builtins.readFile ./versions.json);
+      flixVersions = builtins.removeAttrs flixData [ "latest" ];
+      latestVersion = flixData.latest;
+
+      # "0.75.1" → "flix_0_75_1"
+      attrName = version: "flix_${builtins.replaceStrings ["."] ["_"] version}";
+
+      mkFlixOverlay = version: hash: final: prev: {
+        flix = prev.flix.overrideAttrs (finalAttrs: previousAttrs: {
+          version = version;
+          src = prev.fetchurl {
+            url = "https://github.com/flix/flix/releases/download/v${version}/flix.jar";
+            sha256 = hash;
           };
-        mkApp = flix: { type = "app"; program = "${flix}/bin/flix"; };
-        flix_0_71_0 = mkFlixOverlay "0.71.0" "sha256-Ha5oRDpQ7YuGsaF/ZNx8b+HjTSroxZEjzI3zR3g7NXI=";
-        flix_0_72_0 = mkFlixOverlay "0.72.0" "sha256-87WDphvCBJf5M46NtKGCTEu6k0g6SF/yttmRrEA8Nis=";
-        flix_0_73_0 = mkFlixOverlay "0.73.0" "sha256-X2kiXS4qXAKau1qJswbJfi/gsty49RMW355+yYaBGUM=";
-        flix_0_74_0 = mkFlixOverlay "0.74.0" "sha256-hHu5EXDF7PphruFuyY000M5JZqmRcyuv7g4i60T6YvM=";
-        flix_0_75_0 = mkFlixOverlay "0.75.0" "sha256-Zk9CvLQkBe+vRDj2dCfC7sFq3wxbNyNrDev3Q8ZrRXs=";
-        flix_0_75_1 = mkFlixOverlay "0.75.1" "sha256-4xd3AK6tiiKkLJEOc7+4oyb+/bq04+rq9tVcMopr2Tg=";
-    in my-nix-utils.lib.eachSystems nixpkgs.lib.systems.flakeExposed (system:
-    {
-      overlays = {
-        inherit flix_0_71_0;
-        inherit flix_0_72_0;
-        inherit flix_0_73_0;
-        inherit flix_0_74_0;
-        inherit flix_0_75_0;
-        inherit flix_0_75_1;
+        });
       };
 
-      apps.${system} = {
-        flix_0_71_0 = mkApp self.packages.${system}.flix_0_71_0;
-        flix_0_72_0 = mkApp self.packages.${system}.flix_0_72_0;
-        flix_0_73_0 = mkApp self.packages.${system}.flix_0_73_0;
-        flix_0_74_0 = mkApp self.packages.${system}.flix_0_74_0;
-        flix_0_75_0 = mkApp self.packages.${system}.flix_0_75_0;
-        flix_0_75_1 = mkApp self.packages.${system}.flix_0_75_1;
-        default = self.apps.${system}.flix_0_75_1;
-      };
+      pkgsForSystemWithOverlays = system: overlays: import nixpkgs { inherit system; inherit overlays; };
 
-      packages.${system} = {
-        flix_0_71_0 = (pkgsForSystemWithOverlays system [ flix_0_71_0 ]).flix;
-        flix_0_72_0 = (pkgsForSystemWithOverlays system [ flix_0_72_0 ]).flix;
-        flix_0_73_0 = (pkgsForSystemWithOverlays system [ flix_0_73_0 ]).flix;
-        flix_0_74_0 = (pkgsForSystemWithOverlays system [ flix_0_74_0 ]).flix;
-        flix_0_75_0 = (pkgsForSystemWithOverlays system [ flix_0_75_0 ]).flix;
-        flix_0_75_1 = (pkgsForSystemWithOverlays system [ flix_0_75_1 ]).flix;
-        default = self.packages.${system}.flix_0_75_1;
-      };
+      mkDevShell = system: overlays:
+        let pkgs = pkgsForSystemWithOverlays system overlays;
+        in pkgs.mkShell {
+          packages = [ pkgs.flix ];
+        };
 
-      devShells.${system} = {
-        flix_0_71_0 = mkDevShell system [ flix_0_71_0 ];
-        flix_0_72_0 = mkDevShell system [ flix_0_72_0 ];
-        flix_0_73_0 = mkDevShell system [ flix_0_73_0 ];
-        flix_0_74_0 = mkDevShell system [ flix_0_74_0 ];
-        flix_0_75_0 = mkDevShell system [ flix_0_75_0 ];
-        flix_0_75_1 = mkDevShell system [ flix_0_75_1 ];
-        default = self.devShells.${system}.flix_0_75_1;
+      mkApp = flix: { type = "app"; program = "${flix}/bin/flix"; };
+
+      # Overlays keyed by attribute name (e.g. flix_0_75_1)
+      flixOverlays = builtins.listToAttrs (
+        map (version: {
+          name = attrName version;
+          value = mkFlixOverlay version flixVersions.${version};
+        }) (builtins.attrNames flixVersions)
+      );
+
+      # Generate { flix_0_71_0 = f "0.71.0"; ... } for each version
+      forEachVersion = f: builtins.listToAttrs (
+        map (version: {
+          name = attrName version;
+          value = f version;
+        }) (builtins.attrNames flixVersions)
+      );
+    in
+    # Build per-system outputs by folding over nixpkgs' system list.
+    # `acc.<category> or {} // { ${system} = ...; }` is needed because `//`
+    # is a shallow merge — nesting the merge per-category prevents each
+    # iteration from overwriting the accumulated attrset for other systems.
+    builtins.foldl' (acc: system: acc // {
+      apps = acc.apps or {} // {
+        ${system} =
+          forEachVersion (version: mkApp self.packages.${system}.${attrName version})
+          // { default = self.apps.${system}.${attrName latestVersion}; };
       };
-    });
+      packages = acc.packages or {} // {
+        ${system} =
+          forEachVersion (version: (pkgsForSystemWithOverlays system [ flixOverlays.${attrName version} ]).flix)
+          // { default = self.packages.${system}.${attrName latestVersion}; };
+      };
+      devShells = acc.devShells or {} // {
+        ${system} =
+          forEachVersion (version: mkDevShell system [ flixOverlays.${attrName version} ])
+          // { default = self.devShells.${system}.${attrName latestVersion}; };
+      };
+    }) { overlays = flixOverlays; } nixpkgs.lib.systems.flakeExposed;
 }
