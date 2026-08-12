@@ -125,18 +125,10 @@ jobs:
         run: |
           branch="update-flix-${VERSION}"
 
-          if gh pr create \
+          if ! gh pr create \
             --head "$branch" \
             --title "feat: add flix ${VERSION}" \
-            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow." \
-            2>pr_create_error.log; then
-            exit 0
-          fi
-
-          cat pr_create_error.log >&2
-          if grep -q "is not permitted to create or approve pull requests" pr_create_error.log; then
-            echo "::error::GitHub Actions does not have permission to create pull requests in this repository. Enable it under Settings > Actions > General > Workflow permissions > \"Allow GitHub Actions to create and approve pull requests\", then re-run this workflow (branch '${branch}' has already been pushed)."
-          else
+            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow."; then
             echo "::error::Failed to create a pull request for branch '${branch}'."
+            exit 1
           fi
-          exit 1
