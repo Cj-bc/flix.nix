@@ -87,11 +87,10 @@ jobs:
           ATTR: ${{ steps.latest.outputs.attr }}
         run: nix build ".#packages.x86_64-linux.${ATTR}" --no-link
 
-      - name: Commit and open pull request
+      - name: Push branch
         if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.latest.outputs.version }}
-          ATTR: ${{ steps.latest.outputs.attr }}
         run: |
           branch="update-flix-${VERSION}"
 
@@ -100,8 +99,44 @@ jobs:
           git checkout -b "$branch"
           git add versions.json
           git commit -m "feat: add flix ${VERSION}"
-          git push -u origin "$branch"
 
-          gh pr create \
+          # A branch with this name but no open PR (checked in the previous
+          # step) can only be a leftover from a previous run that failed
+          # after pushing but before opening its pull request. Clear it so
+          # this run isn't blocked by it.
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "::warning::Branch '${branch}' already exists on origin with no open pull request against it (leftover from a previous failed run). Deleting it before pushing."
+            if ! git push origin --delete "$branch"; then
+              echo "::error::Could not delete the stale remote branch '${branch}'. Delete it manually (git push origin --delete ${branch}) and re-run this workflow."
+              exit 1
+            fi
+          fi
+
+          if ! git push -u origin "$branch"; then
+            echo "::error::Failed to push branch '${branch}' to origin."
+            exit 1
+          fi
+
+      - name: Open pull request
+        if: steps.check.outputs.new == 'true' && steps.pr_check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.latest.outputs.version }}
+          ATTR: ${{ steps.latest.outputs.attr }}
+        run: |
+          branch="update-flix-${VERSION}"
+
+          if gh pr create \
+            --head "$branch" \
             --title "feat: add flix ${VERSION}" \
-            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow."
+            --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow." \
+            2>pr_create_error.log; then
+            exit 0
+          fi
+
+          cat pr_create_error.log >&2
+          if grep -q "is not permitted to create or approve pull requests" pr_create_error.log; then
+            echo "::error::GitHub Actions does not have permission to create pull requests in this repository. Enable it under Settings > Actions > General > Workflow permissions > \"Allow GitHub Actions to create and approve pull requests\", then re-run this workflow (branch '${branch}' has already been pushed)."
+          else
+            echo "::error::Failed to create a pull request for branch '${branch}'."
+          fi
+          exit 1
