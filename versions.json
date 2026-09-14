@@ -1,5 +1,5 @@
 {
-  "latest": "0.75.3",
+  "latest": "0.76.0",
   "0.71.0": "sha256-Ha5oRDpQ7YuGsaF/ZNx8b+HjTSroxZEjzI3zR3g7NXI=",
   "0.72.0": "sha256-87WDphvCBJf5M46NtKGCTEu6k0g6SF/yttmRrEA8Nis=",
   "0.73.0": "sha256-X2kiXS4qXAKau1qJswbJfi/gsty49RMW355+yYaBGUM=",
@@ -7,5 +7,6 @@
   "0.75.0": "sha256-Zk9CvLQkBe+vRDj2dCfC7sFq3wxbNyNrDev3Q8ZrRXs=",
   "0.75.1": "sha256-4xd3AK6tiiKkLJEOc7+4oyb+/bq04+rq9tVcMopr2Tg=",
   "0.75.2": "0nn1r1k2k0xhrkqcb7nllrkn3s10n96dbf4kwzkdv815ay3pssd2",
-  "0.75.3": "0m6rkp9sa0xw99p7gzbvx6xk5lqlaccbz6b3zz5y1mllckdkq4mz"
+  "0.75.3": "0m6rkp9sa0xw99p7gzbvx6xk5lqlaccbz6b3zz5y1mllckdkq4mz",
+  "0.76.0": "1d5hna4cp9x650b42b1kik9vyrvgylq99sk4cgnh770r1s3s7nfq"
 }
