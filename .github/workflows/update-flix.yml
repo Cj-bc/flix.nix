@@ -127,6 +127,7 @@ jobs:
 
           if ! gh pr create \
             --head "$branch" \
+            --assignee "@me" \
             --title "feat: add flix ${VERSION}" \
             --body "Adds \`${ATTR}\` (flix ${VERSION}) and updates the default to point to it. Opened automatically by the update-flix workflow."; then
             echo "::error::Failed to create a pull request for branch '${branch}'."
